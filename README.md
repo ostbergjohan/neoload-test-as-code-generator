@@ -15,6 +15,10 @@ This is a React-based application that serves as a GUI tool for generating NeoLo
 
 ---
 
+![Screendump of the application](screenshots/screendump.png)
+
+---
+
 ## Code Overview
 
 The application is structured into several key components:
