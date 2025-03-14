@@ -19,6 +19,9 @@ This is a React-based application that serves as a GUI tool for generating NeoLo
 
 ---
 
+**Note:** The NeoLoadCompare backend is required to use this application. Make sure the backend is installed and running before using any features.
+
+
 ## Code Overview
 
 The application is structured into several key components:
@@ -70,8 +73,10 @@ To install and run the application with npm, follow these steps:
 
    ```bash
    git clone https://github.com/yourusername/neoload-test-as-code-generator.git
-   cd neoload-test-as-code-generator
-   
+   cd neoload-test-as-code-generator```
+
+2. **add endpoint to NeoLoadUtils in config.js:**
+   ```export const backendUrl = process.env.REACT_APP_BACKEND_URL || "https://your-neoloadutils-endpoint.com";```   
    
 ## Install Dependencies:
 
