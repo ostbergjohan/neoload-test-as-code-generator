@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { backendUrl } from "./config";
+import React, { useState, useEffect, useCallback } from "react";
 import {
     FaTrashAlt,
     FaPlus,
@@ -12,28 +11,22 @@ import {
 } from "react-icons/fa";
 import { SiYaml } from "react-icons/si";
 
-// Custom parser to convert a raw HTTP request string into an object.
+const backendUrl = "http://localhost:8080";
+
 function parseHTTPRequest(text) {
-    console.log("Parsing HTTP request text:", text);
     const lines = text.split(/\r?\n/);
     let i = 0;
-    while (i < lines.length && lines[i].trim() === "") {
-        i++;
-    }
-    if (i >= lines.length) {
-        console.error("No content found in HTTP request text.");
-        return null;
-    }
+    while (i < lines.length && lines[i].trim() === "") i++;
+    if (i >= lines.length) return null;
+
     const requestLine = lines[i++].trim();
-    console.log("Request line:", requestLine);
     const parts = requestLine.split(" ");
-    if (parts.length < 3) {
-        console.error("Request line malformed:", requestLine);
-        return null;
-    }
+    if (parts.length < 3) return null;
+
     const method = parts[0];
     const requestURI = parts[1];
     const headers = {};
+
     for (; i < lines.length; i++) {
         const line = lines[i];
         if (line.trim() === "") {
@@ -47,14 +40,14 @@ function parseHTTPRequest(text) {
             headers[key] = value;
         }
     }
+
     const body = lines.slice(i).join("\n").trim();
     let url = requestURI;
     if (headers["Host"]) {
         url = "http://" + headers["Host"] + requestURI;
     }
-    const parsed = { method, url, headers, body, name: "transaction name" };
-    console.log("Parsed HTTP request object:", parsed);
-    return parsed;
+
+    return { method, url, headers, body, name: "transaction name" };
 }
 
 function HeaderRow({ transactionIndex, headerKey, headerValue, updateHeaderKey, updateHeaderValue, removeHeader }) {
@@ -96,12 +89,15 @@ function HeaderRow({ transactionIndex, headerKey, headerValue, updateHeaderKey, 
 
 function FileRow({ fileIndex, fileData, updateFile, removeFile }) {
     const [localColumnNames, setLocalColumnNames] = useState(fileData.column_names.join(", "));
+
     useEffect(() => {
         setLocalColumnNames(fileData.column_names.join(", "));
     }, [fileData.column_names]);
+
     const parametersUsed = fileData.column_names
         .map((col) => `\${${fileData.name}.${col}}`)
         .join(", ");
+
     return (
         <div style={{ marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
@@ -175,8 +171,10 @@ function TransactionRow({
     const [showImportField, setShowImportField] = useState(false);
     const [importText, setImportText] = useState("");
     const [importCompleted, setImportCompleted] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
 
     const handleImportSubmit = async () => {
+        setIsImporting(true);
         try {
             const response = await fetch(`${backendUrl}/convertHTTP`, {
                 method: "POST",
@@ -184,11 +182,12 @@ function TransactionRow({
                 body: importText,
             });
             const text = (await response.text()).trim();
-            console.log("Raw response text:", text);
+
             if (!text) {
                 alert("Empty response from convertHTTP endpoint");
                 return;
             }
+
             let data;
             if (text.startsWith("{")) {
                 try {
@@ -205,6 +204,7 @@ function TransactionRow({
                     return;
                 }
             }
+
             updateTransaction(tIndex, { ...transaction, ...data });
             setShowImportField(false);
             setImportText("");
@@ -212,12 +212,14 @@ function TransactionRow({
         } catch (error) {
             console.error("Error converting HTTP request:", error);
             alert("Error converting HTTP request: " + error.message);
+        } finally {
+            setIsImporting(false);
         }
     };
 
     return (
         <div style={{ marginBottom: "12px", width: "100%" }}>
-            <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                 <button
                     type="button"
                     onClick={() => removeTransaction(tIndex)}
@@ -253,39 +255,43 @@ function TransactionRow({
                     </button>
                 )}
             </div>
+
             {showImportField && !importCompleted && (
                 <div style={{ marginBottom: "8px" }}>
-          <textarea
-              placeholder="Paste HTTP request here"
-              value={importText}
-              onChange={(e) => setImportText(e.target.value)}
-              style={{
-                  width: "100%",
-                  height: "100px",
-                  border: "1px solid #ccc",
-                  padding: "8px",
-                  borderRadius: "4px",
-                  marginBottom: "8px",
-              }}
-          />
+                    <textarea
+                        placeholder="Paste HTTP request here"
+                        value={importText}
+                        onChange={(e) => setImportText(e.target.value)}
+                        style={{
+                            width: "100%",
+                            height: "100px",
+                            border: "1px solid #ccc",
+                            padding: "8px",
+                            borderRadius: "4px",
+                            marginBottom: "8px",
+                        }}
+                    />
                     <button
                         type="button"
                         onClick={handleImportSubmit}
+                        disabled={isImporting}
                         style={{
-                            backgroundColor: "#10b981",
+                            backgroundColor: isImporting ? "#9ca3af" : "#10b981",
                             color: "#fff",
                             padding: "8px 16px",
                             border: "none",
                             borderRadius: "4px",
-                            cursor: "pointer",
+                            cursor: isImporting ? "not-allowed" : "pointer",
                             display: "flex",
-                            alignItems: "center"
+                            alignItems: "center",
+                            opacity: isImporting ? 0.6 : 1
                         }}
                     >
-                        <FaPlus style={{ marginRight: "4px" }} /> Submit
+                        <FaPlus style={{ marginRight: "4px" }} /> {isImporting ? "Importing..." : "Submit"}
                     </button>
                 </div>
             )}
+
             <div style={{ marginBottom: "8px" }}>
                 <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "500" }}>
                     name
@@ -297,6 +303,7 @@ function TransactionRow({
                     style={{ border: "1px solid #ccc", padding: "8px", width: "100%", borderRadius: "4px" }}
                 />
             </div>
+
             <div style={{ marginBottom: "8px" }}>
                 <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "500" }}>
                     url
@@ -308,17 +315,19 @@ function TransactionRow({
                     style={{ border: "1px solid #ccc", padding: "8px", width: "100%", borderRadius: "4px" }}
                 />
             </div>
+
             <div style={{ marginBottom: "8px" }}>
                 <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "500" }}>
                     assertion
                 </label>
                 <input
                     type="text"
-                    value={transaction.assertion}
+                    value={transaction.assertion || ""}
                     onChange={(e) => handleChange(e, "assertion", tIndex)}
                     style={{ border: "1px solid #ccc", padding: "8px", width: "100%", borderRadius: "4px" }}
                 />
             </div>
+
             <div style={{ marginBottom: "8px" }}>
                 <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "500" }}>
                     method
@@ -335,26 +344,27 @@ function TransactionRow({
                     <option value="PATCH">PATCH</option>
                 </select>
             </div>
+
             {["POST", "PUT", "PATCH"].includes(transaction.method) && (
                 <div style={{ marginBottom: "8px" }}>
                     <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "500" }}>
                         body
                     </label>
-                    <input
-                        type="text"
-                        value={transaction.body}
+                    <textarea
+                        value={transaction.body || ""}
                         onChange={(e) => handleChange(e, "body", tIndex)}
-                        style={{ border: "1px solid #ccc", padding: "8px", width: "100%", borderRadius: "4px" }}
+                        style={{ border: "1px solid #ccc", padding: "8px", width: "100%", borderRadius: "4px", minHeight: "80px" }}
                     />
                 </div>
             )}
+
             <h4 style={{ fontSize: "1rem", fontWeight: "500", marginTop: "8px" }}>Headers</h4>
             {Object.entries(transaction.headers).length === 0 && (
                 <div style={{ marginBottom: "8px", fontStyle: "italic" }}>No headers added.</div>
             )}
             {Object.entries(transaction.headers).map(([headerKey, headerValue], headerIndex) => (
                 <HeaderRow
-                    key={`header-${headerIndex}`}
+                    key={`${tIndex}-header-${headerIndex}`}
                     transactionIndex={tIndex}
                     headerKey={headerKey}
                     headerValue={headerValue}
@@ -381,6 +391,7 @@ function TransactionRow({
             >
                 <FaPlus style={{ marginRight: "4px" }} /> Add Header
             </button>
+
             <h4 style={{ fontSize: "1rem", fontWeight: "500", marginTop: "8px" }}>Extractors</h4>
             {transaction.extractors.length === 0 && (
                 <div style={{ marginBottom: "8px", fontStyle: "italic" }}>No Extractors added.</div>
@@ -390,13 +401,13 @@ function TransactionRow({
                     key={exIndex}
                     style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "8px" }}
                 >
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                         <input
                             type="text"
                             value={extractor.name}
                             placeholder="Name of parameter"
                             onChange={(e) => handleChange(e, "name", tIndex, exIndex)}
-                            style={{ border: "1px solid #ccc", padding: "8px", width: "20%", borderRadius: "4px" }}
+                            style={{ border: "1px solid #ccc", padding: "8px", width: "20%", minWidth: "120px", borderRadius: "4px" }}
                         />
                         <select
                             value={extractor.type || "jsonpath"}
@@ -421,7 +432,7 @@ function TransactionRow({
                                 const key = extractor.type || "jsonpath";
                                 handleChange(e, key, tIndex, exIndex);
                             }}
-                            style={{ border: "1px solid #ccc", padding: "8px", width: "40%", borderRadius: "4px" }}
+                            style={{ border: "1px solid #ccc", padding: "8px", flex: "1", minWidth: "200px", borderRadius: "4px" }}
                         />
                         <button
                             type="button"
@@ -491,8 +502,9 @@ export default function App() {
     const [activeTab, setActiveTab] = useState("form");
     const [generatedScript, setGeneratedScript] = useState("");
     const [jsonText, setJsonText] = useState("");
+    const [isGenerating, setIsGenerating] = useState(false);
 
-    const transformExtractors = (extractors) =>
+    const transformExtractors = useCallback((extractors) =>
         extractors.map((extractor) => {
             const newExtractor = { name: extractor.name };
             if (extractor.type === "jsonpath") {
@@ -503,9 +515,9 @@ export default function App() {
                 newExtractor.regexp = extractor.regexp;
             }
             return newExtractor;
-        });
+        }), []);
 
-    const getTransformedFormData = () => {
+    const getTransformedFormData = useCallback(() => {
         return {
             ...formData,
             transactions: formData.transactions.map((transaction) => ({
@@ -513,14 +525,14 @@ export default function App() {
                 extractors: transformExtractors(transaction.extractors || []),
             })),
         };
-    };
+    }, [formData, transformExtractors]);
 
     useEffect(() => {
         if (activeTab === "json") {
             const transformedData = getTransformedFormData();
             setJsonText(JSON.stringify(transformedData, null, 2));
         }
-    }, [activeTab, formData]);
+    }, [activeTab, getTransformedFormData]);
 
     const isValidUrl = (url) => {
         try {
@@ -531,7 +543,7 @@ export default function App() {
         }
     };
 
-    const handleChange = (e, fieldKey, transactionIndex, extractorIndex) => {
+    const handleChange = useCallback((e, fieldKey, transactionIndex, extractorIndex) => {
         const value = e.target.value;
         setFormData((prev) => {
             const newData = { ...prev };
@@ -546,17 +558,17 @@ export default function App() {
             }
             return newData;
         });
-    };
+    }, []);
 
-    const updateHeaderValue = (transactionIndex, headerKey, newValue) => {
+    const updateHeaderValue = useCallback((transactionIndex, headerKey, newValue) => {
         setFormData((prev) => {
             const newData = { ...prev };
             newData.transactions[transactionIndex].headers[headerKey] = newValue;
             return newData;
         });
-    };
+    }, []);
 
-    const updateHeaderKey = (transactionIndex, oldKey, newKey) => {
+    const updateHeaderKey = useCallback((transactionIndex, oldKey, newKey) => {
         if (newKey.trim() === "" || newKey === oldKey) return;
         setFormData((prev) => {
             const newData = { ...prev };
@@ -567,17 +579,17 @@ export default function App() {
             newData.transactions[transactionIndex].headers = headers;
             return newData;
         });
-    };
+    }, []);
 
-    const updateTransaction = (index, newTransaction) => {
+    const updateTransaction = useCallback((index, newTransaction) => {
         setFormData((prev) => {
             const newTransactions = [...prev.transactions];
             newTransactions[index] = newTransaction;
             return { ...prev, transactions: newTransactions };
         });
-    };
+    }, []);
 
-    const addTransaction = () => {
+    const addTransaction = useCallback(() => {
         setFormData((prev) => ({
             ...prev,
             transactions: [
@@ -593,16 +605,16 @@ export default function App() {
                 },
             ],
         }));
-    };
+    }, []);
 
-    const removeTransaction = (index) => {
-        setFormData((prev) => {
-            const newTransactions = prev.transactions.filter((_, i) => i !== index);
-            return { ...prev, transactions: newTransactions };
-        });
-    };
+    const removeTransaction = useCallback((index) => {
+        setFormData((prev) => ({
+            ...prev,
+            transactions: prev.transactions.filter((_, i) => i !== index)
+        }));
+    }, []);
 
-    const addHeader = (transactionIndex) => {
+    const addHeader = useCallback((transactionIndex) => {
         setFormData((prev) => {
             const newData = { ...prev };
             let headers = { ...newData.transactions[transactionIndex].headers };
@@ -613,16 +625,14 @@ export default function App() {
                     i++;
                 }
                 newKey = `New-Header-${i}`;
-            } else {
-                newKey = "";
             }
             headers[newKey] = "";
             newData.transactions[transactionIndex].headers = headers;
             return newData;
         });
-    };
+    }, []);
 
-    const removeHeader = (transactionIndex, headerKey) => {
+    const removeHeader = useCallback((transactionIndex, headerKey) => {
         setFormData((prev) => {
             const newData = { ...prev };
             const headers = { ...newData.transactions[transactionIndex].headers };
@@ -630,9 +640,9 @@ export default function App() {
             newData.transactions[transactionIndex].headers = headers;
             return newData;
         });
-    };
+    }, []);
 
-    const addExtractor = (transactionIndex) => {
+    const addExtractor = useCallback((transactionIndex) => {
         setFormData((prev) => {
             const newData = { ...prev };
             const extractors = newData.transactions[transactionIndex].extractors || [];
@@ -642,19 +652,17 @@ export default function App() {
             ];
             return newData;
         });
-    };
+    }, []);
 
-    const removeExtractor = (transactionIndex, extractorIndex) => {
+    const removeExtractor = useCallback((transactionIndex, extractorIndex) => {
         setFormData((prev) => {
             const newData = { ...prev };
-            const newExtractors = [...newData.transactions[transactionIndex].extractors];
-            newExtractors.splice(extractorIndex, 1);
-            newData.transactions[transactionIndex].extractors = newExtractors;
+            newData.transactions[transactionIndex].extractors.splice(extractorIndex, 1);
             return newData;
         });
-    };
+    }, []);
 
-    const updateFile = (fileIndex, fieldKey, value) => {
+    const updateFile = useCallback((fileIndex, fieldKey, value) => {
         setFormData((prev) => {
             const newFiles = [...prev.files];
             if (fieldKey === "column_names") {
@@ -664,25 +672,25 @@ export default function App() {
             }
             return { ...prev, files: newFiles };
         });
-    };
+    }, []);
 
-    const addFile = () => {
+    const addFile = useCallback(() => {
         setFormData((prev) => ({
             ...prev,
             files: [...prev.files, { name: "", column_names: [], path: "" }],
         }));
-    };
+    }, []);
 
-    const removeFile = (fileIndex) => {
-        setFormData((prev) => {
-            const newFiles = prev.files.filter((_, i) => i !== fileIndex);
-            return { ...prev, files: newFiles };
-        });
-    };
+    const removeFile = useCallback((fileIndex) => {
+        setFormData((prev) => ({
+            ...prev,
+            files: prev.files.filter((_, i) => i !== fileIndex)
+        }));
+    }, []);
 
     const handleSubmit = async (e) => {
         if (e && e.preventDefault) e.preventDefault();
-        console.log("Submitting form with data:", formData);
+
         for (let i = 0; i < formData.transactions.length; i++) {
             const transactionUrl = formData.transactions[i].url;
             if (!isValidUrl(transactionUrl)) {
@@ -690,6 +698,8 @@ export default function App() {
                 return;
             }
         }
+
+        setIsGenerating(true);
         try {
             const transformedData = getTransformedFormData();
             const response = await fetch(`${backendUrl}/NeoLoadYamlGenerator`, {
@@ -697,12 +707,19 @@ export default function App() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(transformedData),
             });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const text = await response.text();
             setGeneratedScript(text);
             setActiveTab("generatedScript");
-            console.log("Response Status:", response.status);
         } catch (error) {
             console.error("Error during submission:", error);
+            alert("Error generating script: " + error.message);
+        } finally {
+            setIsGenerating(false);
         }
     };
 
@@ -730,12 +747,13 @@ export default function App() {
     };
 
     return (
-        <div style={{ padding: "16px" }}>
+        <div style={{ padding: "16px", maxWidth: "1200px" }}>
             <h1 style={{ display: "flex", alignItems: "center", fontSize: "2rem", fontWeight: "bold", marginBottom: "16px" }}>
                 <SiYaml style={{ marginRight: "8px", fontSize: "2.5rem", color: "#FCA121" }} />
                 NeoLoad Test-as-code generator
             </h1>
-            <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
+
+            <div style={{ display: "flex", gap: "16px", marginBottom: "16px", flexWrap: "wrap" }}>
                 <button
                     type="button"
                     onClick={() => setActiveTab("form")}
@@ -785,8 +803,9 @@ export default function App() {
                     <FaFileAlt style={{ marginRight: "4px" }} /> Generated script
                 </button>
             </div>
+
             {activeTab === "form" && (
-                <div style={{ width: "50%", minWidth: "500px" }}>
+                <div style={{ width: "100%", maxWidth: "800px" }}>
                     {Object.keys(initialData).map(
                         (key) =>
                             key !== "transactions" &&
@@ -810,6 +829,7 @@ export default function App() {
                                 </div>
                             )
                     )}
+
                     <h2 style={{ fontSize: "1.25rem", marginTop: "16px" }}>Parameters from CSV file</h2>
                     <div style={{ border: "1px solid #ddd", padding: "12px", borderRadius: "4px", marginBottom: "16px" }}>
                         {formData.files.length === 0 && (
@@ -836,6 +856,7 @@ export default function App() {
                             <FaPlus style={{ marginRight: "4px" }} /> Add File
                         </button>
                     </div>
+
                     <h2 style={{ fontSize: "1.25rem", marginTop: "16px" }}>Transactions</h2>
                     <div style={{ border: "1px solid #ddd", padding: "12px", borderRadius: "4px", marginBottom: "16px" }}>
                         {formData.transactions.length === 0 && (
@@ -875,27 +896,31 @@ export default function App() {
                             <FaPlus style={{ marginRight: "4px" }} /> Add Transaction
                         </button>
                     </div>
+
                     <button
                         type="button"
                         onClick={handleSubmit}
+                        disabled={isGenerating}
                         style={{
-                            backgroundColor: "#10b981",
+                            backgroundColor: isGenerating ? "#9ca3af" : "#10b981",
                             color: "#fff",
                             padding: "8px 16px",
                             border: "none",
                             borderRadius: "4px",
                             marginTop: "8px",
-                            cursor: "pointer",
+                            cursor: isGenerating ? "not-allowed" : "pointer",
                             display: "flex",
-                            alignItems: "center"
+                            alignItems: "center",
+                            opacity: isGenerating ? 0.6 : 1
                         }}
                     >
-                        <FaDownload style={{ marginRight: "4px" }} /> Generate script
+                        <FaDownload style={{ marginRight: "4px" }} /> {isGenerating ? "Generating..." : "Generate script"}
                     </button>
                 </div>
             )}
+
             {activeTab === "json" && (
-                <div style={{ width: "50%", minWidth: "500px" }}>
+                <div style={{ width: "100%", maxWidth: "800px" }}>
                     <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "8px" }}>JSON</h3>
                     <textarea
                         value={jsonText}
@@ -909,6 +934,7 @@ export default function App() {
                             minHeight: "300px",
                             fontSize: "0.75rem",
                             whiteSpace: "pre-wrap",
+                            fontFamily: "monospace"
                         }}
                     />
                     <button
@@ -930,15 +956,16 @@ export default function App() {
                     </button>
                 </div>
             )}
+
             {activeTab === "generatedScript" && (
-                <div style={{ width: "50%", minWidth: "500px" }}>
+                <div style={{ width: "100%", maxWidth: "800px" }}>
                     <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "8px" }}>
                         Generated script
                     </h3>
-                    <div style={{ border: "1px solid #ddd", padding: "16px", borderRadius: "4px", backgroundColor: "#f9fafb", overflow: "auto" }}>
-            <pre style={{ fontSize: "0.75rem", whiteSpace: "pre-wrap" }}>
-              {generatedScript ? generatedScript : "No script generated yet."}
-            </pre>
+                    <div style={{ border: "1px solid #ddd", padding: "16px", borderRadius: "4px", backgroundColor: "#f9fafb", overflow: "auto", maxHeight: "600px" }}>
+                        <pre style={{ fontSize: "0.75rem", whiteSpace: "pre-wrap", margin: 0, fontFamily: "monospace" }}>
+                            {generatedScript ? generatedScript : "No script generated yet."}
+                        </pre>
                     </div>
                     {generatedScript && (
                         <button
