@@ -7,7 +7,11 @@ import {
     FaWpforms,
     FaFileCode,
     FaFileAlt,
-    FaCheck
+    FaCheck,
+    FaGithub,
+    FaServer,
+    FaCheckCircle,
+    FaTimesCircle
 } from "react-icons/fa";
 import { SiYaml } from "react-icons/si";
 
@@ -486,6 +490,99 @@ function TransactionRow({
     );
 }
 
+function Footer() {
+    const [backendStatus, setBackendStatus] = useState("checking");
+
+    useEffect(() => {
+        const checkBackend = async () => {
+            try {
+                const response = await fetch(`${backendUrl}/healthcheck`, {
+                    method: "GET",
+                    signal: AbortSignal.timeout(3000)
+                });
+                if (response.ok) {
+                    setBackendStatus("online");
+                } else {
+                    setBackendStatus("offline");
+                }
+            } catch (error) {
+                setBackendStatus("offline");
+            }
+        };
+
+        checkBackend();
+        const interval = setInterval(checkBackend, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <footer style={{
+            marginTop: "48px",
+            paddingTop: "24px",
+            borderTop: "2px solid #e5e7eb",
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            flexWrap: "wrap",
+            fontSize: "0.875rem",
+            color: "#6b7280"
+        }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <FaServer style={{ fontSize: "1rem" }} />
+                <span style={{ fontWeight: "500" }}>Backend:</span>
+                <a
+                    href={backendUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                        color: "#3b82f6",
+                        textDecoration: "none",
+                        fontFamily: "monospace"
+                    }}
+                >
+                    {backendUrl}
+                </a>
+                {backendStatus === "online" && (
+                    <FaCheckCircle style={{ color: "#10b981", fontSize: "1rem" }} title="Backend Online" />
+                )}
+                {backendStatus === "offline" && (
+                    <FaTimesCircle style={{ color: "#ef4444", fontSize: "1rem" }} title="Backend Offline" />
+                )}
+                {backendStatus === "checking" && (
+                    <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>checking...</span>
+                )}
+            </div>
+
+            <span style={{ color: "#d1d5db" }}>•</span>
+
+            <a
+                href="https://github.com/ostbergjohan/neoloadutils"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    color: "#6b7280",
+                    textDecoration: "none",
+                    transition: "color 0.2s"
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = "#000"}
+                onMouseOut={(e) => e.currentTarget.style.color = "#6b7280"}
+            >
+                <FaGithub style={{ fontSize: "1.25rem" }} />
+                <span>ostbergjohan/neoloadutils</span>
+            </a>
+
+            <span style={{ color: "#d1d5db" }}>•</span>
+
+            <span style={{ fontSize: "0.875rem", color: "#9ca3af" }}>
+                Made with ❤️ for performance engineers
+            </span>
+        </footer>
+    );
+}
+
 export default function App() {
     const initialData = {
         name: "",
@@ -747,230 +844,208 @@ export default function App() {
     };
 
     return (
-        <div style={{ padding: "16px", maxWidth: "1200px" }}>
-            <h1 style={{ display: "flex", alignItems: "center", fontSize: "2rem", fontWeight: "bold", marginBottom: "16px" }}>
-                <SiYaml style={{ marginRight: "8px", fontSize: "2.5rem", color: "#FCA121" }} />
-                NeoLoad Test-as-code generator
-            </h1>
-
-            <div style={{ display: "flex", gap: "16px", marginBottom: "16px", flexWrap: "wrap" }}>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab("form")}
-                    style={{
-                        backgroundColor: activeTab === "form" ? "#3b82f6" : "#e5e7eb",
-                        color: activeTab === "form" ? "#fff" : "#000",
-                        padding: "8px 16px",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center"
-                    }}
-                >
-                    <FaWpforms style={{ marginRight: "4px" }} /> Form
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab("json")}
-                    style={{
-                        backgroundColor: activeTab === "json" ? "#3b82f6" : "#e5e7eb",
-                        color: activeTab === "json" ? "#fff" : "#000",
-                        padding: "8px 16px",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center"
-                    }}
-                >
-                    <FaFileCode style={{ marginRight: "4px" }} /> JSON
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab("generatedScript")}
-                    style={{
-                        backgroundColor: activeTab === "generatedScript" ? "#3b82f6" : "#e5e7eb",
-                        color: activeTab === "generatedScript" ? "#fff" : "#000",
-                        padding: "8px 16px",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center"
-                    }}
-                >
-                    <FaFileAlt style={{ marginRight: "4px" }} /> Generated script
-                </button>
-            </div>
-
-            {activeTab === "form" && (
-                <div style={{ width: "100%", maxWidth: "800px" }}>
-                    {Object.keys(initialData).map(
-                        (key) =>
-                            key !== "transactions" &&
-                            key !== "files" && (
-                                <div key={key} style={{ marginBottom: "12px" }}>
-                                    <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "500" }}>
-                                        {key === "pacing"
-                                            ? "pacing (milliseconds)"
-                                            : key === "duration"
-                                                ? "duration (minutes)"
-                                                : key === "name"
-                                                    ? "project name"
-                                                    : key}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData[key]}
-                                        onChange={(e) => handleChange(e, key)}
-                                        style={{ border: "1px solid #ccc", padding: "8px", width: "100%", borderRadius: "4px" }}
-                                    />
-                                </div>
-                            )
-                    )}
-
-                    <h2 style={{ fontSize: "1.25rem", marginTop: "16px" }}>Parameters from CSV file</h2>
-                    <div style={{ border: "1px solid #ddd", padding: "12px", borderRadius: "4px", marginBottom: "16px" }}>
-                        {formData.files.length === 0 && (
-                            <div style={{ marginBottom: "8px", fontStyle: "italic" }}>No files added.</div>
-                        )}
-                        {formData.files.map((file, index) => (
-                            <FileRow key={index} fileIndex={index} fileData={file} updateFile={updateFile} removeFile={removeFile} />
-                        ))}
-                        <button
-                            type="button"
-                            onClick={addFile}
-                            style={{
-                                backgroundColor: "#10b981",
-                                color: "#fff",
-                                padding: "8px 16px",
-                                border: "none",
-                                borderRadius: "4px",
-                                marginTop: "8px",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center"
-                            }}
-                        >
-                            <FaPlus style={{ marginRight: "4px" }} /> Add File
-                        </button>
-                    </div>
-
-                    <h2 style={{ fontSize: "1.25rem", marginTop: "16px" }}>Transactions</h2>
-                    <div style={{ border: "1px solid #ddd", padding: "12px", borderRadius: "4px", marginBottom: "16px" }}>
-                        {formData.transactions.length === 0 && (
-                            <div style={{ marginBottom: "8px", fontStyle: "italic" }}>No transactions added.</div>
-                        )}
-                        {formData.transactions.map((transaction, tIndex) => (
-                            <TransactionRow
-                                key={tIndex}
-                                transaction={transaction}
-                                tIndex={tIndex}
-                                handleChange={handleChange}
-                                removeTransaction={removeTransaction}
-                                updateHeaderKey={updateHeaderKey}
-                                updateHeaderValue={updateHeaderValue}
-                                removeHeader={removeHeader}
-                                addHeader={addHeader}
-                                addExtractor={addExtractor}
-                                removeExtractor={removeExtractor}
-                                updateTransaction={updateTransaction}
-                            />
-                        ))}
-                        <button
-                            type="button"
-                            onClick={addTransaction}
-                            style={{
-                                backgroundColor: "#10b981",
-                                color: "#fff",
-                                padding: "8px 16px",
-                                border: "none",
-                                borderRadius: "4px",
-                                marginTop: "8px",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center"
-                            }}
-                        >
-                            <FaPlus style={{ marginRight: "4px" }} /> Add Transaction
-                        </button>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={handleSubmit}
-                        disabled={isGenerating}
+        <div style={{ padding: "16px", maxWidth: "1200px", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+            <div style={{ flex: "1" }}>
+                <h1 style={{ display: "flex", alignItems: "center", fontSize: "2rem", fontWeight: "bold", marginBottom: "16px" }}>
+                    <img
+                        src="/yaml.jpg"
+                        alt="YAML Logo"
                         style={{
-                            backgroundColor: isGenerating ? "#9ca3af" : "#10b981",
-                            color: "#fff",
-                            padding: "8px 16px",
-                            border: "none",
-                            borderRadius: "4px",
-                            marginTop: "8px",
-                            cursor: isGenerating ? "not-allowed" : "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            opacity: isGenerating ? 0.6 : 1
-                        }}
-                    >
-                        <FaDownload style={{ marginRight: "4px" }} /> {isGenerating ? "Generating..." : "Generate script"}
-                    </button>
-                </div>
-            )}
-
-            {activeTab === "json" && (
-                <div style={{ width: "100%", maxWidth: "800px" }}>
-                    <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "8px" }}>JSON</h3>
-                    <textarea
-                        value={jsonText}
-                        onChange={(e) => setJsonText(e.target.value)}
-                        style={{
-                            border: "1px solid #ddd",
-                            padding: "16px",
-                            borderRadius: "4px",
-                            backgroundColor: "#f9fafb",
-                            width: "100%",
-                            minHeight: "300px",
-                            fontSize: "0.75rem",
-                            whiteSpace: "pre-wrap",
-                            fontFamily: "monospace"
+                            marginRight: "8px",
+                            height: "2.5rem",
+                            width: "auto"
                         }}
                     />
+                    NeoLoad Test-as-code generator
+                </h1>
+
+                <div style={{ display: "flex", gap: "16px", marginBottom: "16px", flexWrap: "wrap" }}>
                     <button
                         type="button"
-                        onClick={applyJsonChanges}
+                        onClick={() => setActiveTab("form")}
                         style={{
-                            backgroundColor: "#10b981",
-                            color: "#fff",
+                            backgroundColor: activeTab === "form" ? "#3b82f6" : "#e5e7eb",
+                            color: activeTab === "form" ? "#fff" : "#000",
                             padding: "8px 16px",
                             border: "none",
                             borderRadius: "4px",
-                            marginTop: "8px",
                             cursor: "pointer",
                             display: "flex",
                             alignItems: "center"
                         }}
                     >
-                        <FaCheck style={{ marginRight: "4px" }} /> Apply JSON changes to form
+                        <FaWpforms style={{ marginRight: "4px" }} /> Form
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab("json")}
+                        style={{
+                            backgroundColor: activeTab === "json" ? "#3b82f6" : "#e5e7eb",
+                            color: activeTab === "json" ? "#fff" : "#000",
+                            padding: "8px 16px",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center"
+                        }}
+                    >
+                        <FaFileCode style={{ marginRight: "4px" }} /> JSON
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab("generatedScript")}
+                        style={{
+                            backgroundColor: activeTab === "generatedScript" ? "#3b82f6" : "#e5e7eb",
+                            color: activeTab === "generatedScript" ? "#fff" : "#000",
+                            padding: "8px 16px",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center"
+                        }}
+                    >
+                        <FaFileAlt style={{ marginRight: "4px" }} /> Generated script
                     </button>
                 </div>
-            )}
 
-            {activeTab === "generatedScript" && (
-                <div style={{ width: "100%", maxWidth: "800px" }}>
-                    <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "8px" }}>
-                        Generated script
-                    </h3>
-                    <div style={{ border: "1px solid #ddd", padding: "16px", borderRadius: "4px", backgroundColor: "#f9fafb", overflow: "auto", maxHeight: "600px" }}>
-                        <pre style={{ fontSize: "0.75rem", whiteSpace: "pre-wrap", margin: 0, fontFamily: "monospace" }}>
-                            {generatedScript ? generatedScript : "No script generated yet."}
-                        </pre>
-                    </div>
-                    {generatedScript && (
+                {activeTab === "form" && (
+                    <div style={{ width: "100%", maxWidth: "800px" }}>
+                        {Object.keys(initialData).map(
+                            (key) =>
+                                key !== "transactions" &&
+                                key !== "files" && (
+                                    <div key={key} style={{ marginBottom: "12px" }}>
+                                        <label style={{ display: "block", fontSize: "0.875rem", fontWeight: "500" }}>
+                                            {key === "pacing"
+                                                ? "pacing (milliseconds)"
+                                                : key === "duration"
+                                                    ? "duration (minutes)"
+                                                    : key === "name"
+                                                        ? "project name"
+                                                        : key}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData[key]}
+                                            onChange={(e) => handleChange(e, key)}
+                                            style={{ border: "1px solid #ccc", padding: "8px", width: "100%", borderRadius: "4px" }}
+                                        />
+                                    </div>
+                                )
+                        )}
+
+                        <h2 style={{ fontSize: "1.25rem", marginTop: "16px" }}>Parameters from CSV file</h2>
+                        <div style={{ border: "1px solid #ddd", padding: "12px", borderRadius: "4px", marginBottom: "16px" }}>
+                            {formData.files.length === 0 && (
+                                <div style={{ marginBottom: "8px", fontStyle: "italic" }}>No files added.</div>
+                            )}
+                            {formData.files.map((file, index) => (
+                                <FileRow key={index} fileIndex={index} fileData={file} updateFile={updateFile} removeFile={removeFile} />
+                            ))}
+                            <button
+                                type="button"
+                                onClick={addFile}
+                                style={{
+                                    backgroundColor: "#10b981",
+                                    color: "#fff",
+                                    padding: "8px 16px",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    marginTop: "8px",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center"
+                                }}
+                            >
+                                <FaPlus style={{ marginRight: "4px" }} /> Add File
+                            </button>
+                        </div>
+
+                        <h2 style={{ fontSize: "1.25rem", marginTop: "16px" }}>Transactions</h2>
+                        <div style={{ border: "1px solid #ddd", padding: "12px", borderRadius: "4px", marginBottom: "16px" }}>
+                            {formData.transactions.length === 0 && (
+                                <div style={{ marginBottom: "8px", fontStyle: "italic" }}>No transactions added.</div>
+                            )}
+                            {formData.transactions.map((transaction, tIndex) => (
+                                <TransactionRow
+                                    key={tIndex}
+                                    transaction={transaction}
+                                    tIndex={tIndex}
+                                    handleChange={handleChange}
+                                    removeTransaction={removeTransaction}
+                                    updateHeaderKey={updateHeaderKey}
+                                    updateHeaderValue={updateHeaderValue}
+                                    removeHeader={removeHeader}
+                                    addHeader={addHeader}
+                                    addExtractor={addExtractor}
+                                    removeExtractor={removeExtractor}
+                                    updateTransaction={updateTransaction}
+                                />
+                            ))}
+                            <button
+                                type="button"
+                                onClick={addTransaction}
+                                style={{
+                                    backgroundColor: "#10b981",
+                                    color: "#fff",
+                                    padding: "8px 16px",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    marginTop: "8px",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center"
+                                }}
+                            >
+                                <FaPlus style={{ marginRight: "4px" }} /> Add Transaction
+                            </button>
+                        </div>
+
                         <button
                             type="button"
-                            onClick={saveScript}
+                            onClick={handleSubmit}
+                            disabled={isGenerating}
+                            style={{
+                                backgroundColor: isGenerating ? "#9ca3af" : "#10b981",
+                                color: "#fff",
+                                padding: "8px 16px",
+                                border: "none",
+                                borderRadius: "4px",
+                                marginTop: "8px",
+                                cursor: isGenerating ? "not-allowed" : "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                opacity: isGenerating ? 0.6 : 1
+                            }}
+                        >
+                            <FaDownload style={{ marginRight: "4px" }} /> {isGenerating ? "Generating..." : "Generate script"}
+                        </button>
+                    </div>
+                )}
+
+                {activeTab === "json" && (
+                    <div style={{ width: "100%", maxWidth: "800px" }}>
+                        <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "8px" }}>JSON</h3>
+                        <textarea
+                            value={jsonText}
+                            onChange={(e) => setJsonText(e.target.value)}
+                            style={{
+                                border: "1px solid #ddd",
+                                padding: "16px",
+                                borderRadius: "4px",
+                                backgroundColor: "#f9fafb",
+                                width: "100%",
+                                minHeight: "300px",
+                                fontSize: "0.75rem",
+                                whiteSpace: "pre-wrap",
+                                fontFamily: "monospace"
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={applyJsonChanges}
                             style={{
                                 backgroundColor: "#10b981",
                                 color: "#fff",
@@ -983,11 +1058,45 @@ export default function App() {
                                 alignItems: "center"
                             }}
                         >
-                            <FaDownload style={{ marginRight: "4px" }} /> Save as default.yaml
+                            <FaCheck style={{ marginRight: "4px" }} /> Apply JSON changes to form
                         </button>
-                    )}
-                </div>
-            )}
+                    </div>
+                )}
+
+                {activeTab === "generatedScript" && (
+                    <div style={{ width: "100%", maxWidth: "800px" }}>
+                        <h3 style={{ fontSize: "1.125rem", fontWeight: "600", marginBottom: "8px" }}>
+                            Generated script
+                        </h3>
+                        <div style={{ border: "1px solid #ddd", padding: "16px", borderRadius: "4px", backgroundColor: "#f9fafb", overflow: "auto", maxHeight: "600px" }}>
+                            <pre style={{ fontSize: "0.75rem", whiteSpace: "pre-wrap", margin: 0, fontFamily: "monospace" }}>
+                                {generatedScript ? generatedScript : "No script generated yet."}
+                            </pre>
+                        </div>
+                        {generatedScript && (
+                            <button
+                                type="button"
+                                onClick={saveScript}
+                                style={{
+                                    backgroundColor: "#10b981",
+                                    color: "#fff",
+                                    padding: "8px 16px",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    marginTop: "8px",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center"
+                                }}
+                            >
+                                <FaDownload style={{ marginRight: "4px" }} /> Save as default.yaml
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            <Footer />
         </div>
     );
 }
